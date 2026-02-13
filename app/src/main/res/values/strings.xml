@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">BeAware</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Welcome to BeAware</string>
+    <string name="onboarding_subtitle">Grant the following permissions to get started</string>
+    <string name="permission_usage_stats_title">Usage Access</string>
+    <string name="permission_usage_stats_desc">Required to detect which app is in the foreground</string>
+    <string name="permission_overlay_title">Display Over Apps</string>
+    <string name="permission_overlay_desc">Required to show the floating timer overlay</string>
+    <string name="permission_notification_title">Notifications</string>
+    <string name="permission_notification_desc">Required to keep the tracking service running</string>
+    <string name="permission_granted">Granted</string>
+    <string name="permission_grant">Grant</string>
+    <string name="onboarding_continue">Continue</string>
 </resources>
