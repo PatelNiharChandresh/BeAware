@@ -12,4 +12,6 @@ interface AppRepository {
     suspend fun insertSession(session: UsageSessionEntity)
     fun getSessionsByDateRange(start: String, end: String): Flow<List<UsageSessionEntity>>
     fun getTotalDurationByApp(start: String, end: String): Flow<List<AppUsageSummary>>
+    fun isTrackingActive(): Flow<Boolean>
+    suspend fun setTrackingActive(active: Boolean)
 }

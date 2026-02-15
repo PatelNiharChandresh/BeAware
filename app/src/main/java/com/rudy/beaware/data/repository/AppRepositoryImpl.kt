@@ -63,4 +63,12 @@ class AppRepositoryImpl @Inject constructor(
     ): Flow<List<AppUsageSummary>> {
         return usageSessionDao.getTotalDurationByApp(start, end)
     }
+
+    override fun isTrackingActive(): Flow<Boolean> {
+        return prefsDataStore.isTrackingActive()
+    }
+
+    override suspend fun setTrackingActive(active: Boolean) {
+        prefsDataStore.setTrackingActive(active)
+    }
 }
