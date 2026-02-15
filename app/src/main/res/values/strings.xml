@@ -13,4 +13,10 @@
     <string name="permission_granted">Granted</string>
     <string name="permission_grant">Grant</string>
     <string name="onboarding_continue">Continue</string>
+
+    <!-- App Picker -->
+    <string name="picker_title">Select Apps</string>
+    <string name="picker_search_hint">Search apps</string>
+    <string name="picker_save">Save</string>
+    <string name="picker_empty">No apps found</string>
 </resources>
