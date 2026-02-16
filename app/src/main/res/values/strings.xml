@@ -19,4 +19,16 @@
     <string name="picker_search_hint">Search apps</string>
     <string name="picker_save">Save</string>
     <string name="picker_empty">No apps found</string>
+
+    <!-- Home -->
+    <string name="home_title">BeAware</string>
+    <string name="home_tracking_active">Tracking Active</string>
+    <string name="home_tracking_inactive">Tracking Inactive</string>
+    <string name="home_tracking_subtitle_active">Monitoring your selected apps</string>
+    <string name="home_tracking_subtitle_inactive">Turn on to start monitoring</string>
+    <string name="home_tracked_apps">Tracked Apps</string>
+    <string name="home_add_apps">Add Apps</string>
+    <string name="home_no_apps">No apps selected</string>
+    <string name="home_no_apps_desc">Tap \"Add Apps\" to choose which apps to track</string>
+    <string name="home_view_stats">View Stats</string>
 </resources>
