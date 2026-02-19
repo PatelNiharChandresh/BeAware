@@ -31,4 +31,13 @@
     <string name="home_no_apps">No apps selected</string>
     <string name="home_no_apps_desc">Tap \"Add Apps\" to choose which apps to track</string>
     <string name="home_view_stats">View Stats</string>
+    <string name="home_no_apps_toast">Select apps to track first</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_name">Tracking Service</string>
+    <string name="notification_tracking_text">Monitoring active</string>
+    <string name="notification_stop">Stop</string>
+
+    <!-- Stats (Phase 2 placeholder) -->
+    <string name="stats_coming_soon">Stats — coming soon</string>
 </resources>

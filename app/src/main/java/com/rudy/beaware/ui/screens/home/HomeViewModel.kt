@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rudy.beaware.R
 import com.rudy.beaware.data.repository.AppRepository
 import com.rudy.beaware.model.AppInfo
 import com.rudy.beaware.service.MonitorService
@@ -72,7 +73,7 @@ class HomeViewModel @Inject constructor(
             } else {
                 // Guard: no apps selected
                 if (currentState.trackedApps.isEmpty()) {
-                    _toastEvent.send("Select apps to track first")
+                    _toastEvent.send(context.getString(R.string.home_no_apps_toast))
                     return@launch
                 }
 
