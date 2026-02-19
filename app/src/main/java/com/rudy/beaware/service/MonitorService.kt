@@ -34,7 +34,7 @@ class MonitorService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("BeAware")
             .setContentText("Monitoring active")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
             .build()
 
