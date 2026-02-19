@@ -26,7 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -60,7 +60,17 @@ class MonitorService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            stopSelf()
+            serviceScope.launch {
+                if (activePackage != null) {
+                    saveActiveSession(System.currentTimeMillis())
+                }
+                repository.setTrackingActive(false)
+                withContext(Dispatchers.Main) {
+                    timerManager?.hide()
+                    timerManager = null
+                    stopSelf()
+                }
+            }
             return START_NOT_STICKY
         }
 
@@ -116,7 +126,7 @@ class MonitorService : Service() {
         return START_STICKY
     }
 
-    private fun checkForeground() {
+    private suspend fun checkForeground() {
         val now = System.currentTimeMillis()
 
         val stats = usageStatsManager.queryUsageStats(
@@ -136,19 +146,16 @@ class MonitorService : Service() {
                     && currentPackage != activePackage -> {
 
                 if (activePackage != null) {
-                    saveSession(
-                        packageName = activePackage!!,
-                        appLabel = activeLabel ?: activePackage!!,
-                        startTime = sessionStartTime,
-                        endTime = now
-                    )
+                    saveActiveSession(now)
                 }
 
                 activePackage = currentPackage
                 activeLabel = resolveAppLabel(currentPackage)
                 sessionStartTime = now
 
-                timerManager?.show(activeLabel!!)
+                withContext(Dispatchers.Main) {
+                    timerManager?.show(activeLabel!!)
+                }
             }
 
             currentPackage != null
@@ -156,20 +163,19 @@ class MonitorService : Service() {
                     && currentPackage == activePackage -> {
 
                 val elapsedSeconds = (now - sessionStartTime) / 1000
-                timerManager?.updateTimer(elapsedSeconds)
+                withContext(Dispatchers.Main) {
+                    timerManager?.updateTimer(elapsedSeconds)
+                }
             }
 
             else -> {
                 if (activePackage != null) {
-                    saveSession(
-                        packageName = activePackage!!,
-                        appLabel = activeLabel ?: activePackage!!,
-                        startTime = sessionStartTime,
-                        endTime = now
-                    )
+                    saveActiveSession(now)
                 }
 
-                timerManager?.hide()
+                withContext(Dispatchers.Main) {
+                    timerManager?.hide()
+                }
 
                 activePackage = null
                 activeLabel = null
@@ -178,30 +184,23 @@ class MonitorService : Service() {
         }
     }
 
-    private fun saveSession(
-        packageName: String,
-        appLabel: String,
-        startTime: Long,
-        endTime: Long
-    ) {
-        val durationMs = endTime - startTime
+    private suspend fun saveActiveSession(endTime: Long) {
+        val durationMs = endTime - sessionStartTime
         if (durationMs < 1_000) return
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val date = dateFormat.format(Date(startTime))
+        val date = dateFormat.format(Date(sessionStartTime))
 
         val session = UsageSessionEntity(
-            packageName = packageName,
-            appLabel = appLabel,
-            startTime = startTime,
+            packageName = activePackage!!,
+            appLabel = activeLabel ?: activePackage!!,
+            startTime = sessionStartTime,
             endTime = endTime,
             durationMs = durationMs,
             date = date
         )
 
-        serviceScope.launch {
-            usageSessionDao.insertSession(session)
-        }
+        usageSessionDao.insertSession(session)
     }
 
     private fun resolveAppLabel(packageName: String): String {
@@ -215,38 +214,8 @@ class MonitorService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-
-        if (activePackage != null) {
-            val now = System.currentTimeMillis()
-            val durationMs = now - sessionStartTime
-            if (durationMs >= 1_000) {
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                val date = dateFormat.format(Date(sessionStartTime))
-                val session = UsageSessionEntity(
-                    packageName = activePackage!!,
-                    appLabel = activeLabel ?: activePackage!!,
-                    startTime = sessionStartTime,
-                    endTime = now,
-                    durationMs = durationMs,
-                    date = date
-                )
-                runBlocking {
-                    usageSessionDao.insertSession(session)
-                }
-            }
-        }
-
         serviceScope.cancel()
-
-        timerManager?.hide()
-        timerManager = null
-
-        runBlocking {
-            repository.setTrackingActive(false)
-        }
-
         stopForeground(STOP_FOREGROUND_REMOVE)
-
         activePackage = null
         activeLabel = null
         sessionStartTime = 0L

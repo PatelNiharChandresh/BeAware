@@ -66,10 +66,11 @@ class HomeViewModel @Inject constructor(
             val currentState = uiState.value
 
             if (currentState.isTracking) {
-                // Stop tracking
-                val intent = Intent(context, MonitorService::class.java)
-                context.stopService(intent)
-                repository.setTrackingActive(false)
+                // Stop tracking — send ACTION_STOP for graceful shutdown
+                val intent = Intent(context, MonitorService::class.java).apply {
+                    action = MonitorService.ACTION_STOP
+                }
+                context.startService(intent)
             } else {
                 // Guard: no apps selected
                 if (currentState.trackedApps.isEmpty()) {
