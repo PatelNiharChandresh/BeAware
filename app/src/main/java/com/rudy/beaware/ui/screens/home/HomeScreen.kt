@@ -43,6 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rudy.beaware.R
 import com.rudy.beaware.model.AppInfo
+import timber.log.Timber
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +57,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.toastEvent.collect { message ->
+            Timber.d("HomeScreen: showing toast: %s", message)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }

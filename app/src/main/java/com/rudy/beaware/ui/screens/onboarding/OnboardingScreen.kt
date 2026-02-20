@@ -44,6 +44,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rudy.beaware.R
+import timber.log.Timber
 
 @Composable
 fun OnboardingScreen(
@@ -56,6 +57,7 @@ fun OnboardingScreen(
     // Refresh permissions every time the user returns to this screen.
     // Covers return from Usage Stats Settings, Overlay Settings, or multitasking.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        Timber.d("OnboardingScreen: ON_RESUME — refreshing permissions")
         viewModel.refreshPermissions()
     }
 
@@ -63,8 +65,8 @@ fun OnboardingScreen(
     // Usage Stats and Overlay cannot use this — they require Settings navigation.
     val notificationLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) {
-        // Ignore the boolean result — refreshPermissions() does a ground-truth system check
+    ) { granted ->
+        Timber.d("OnboardingScreen: notification permission result=%s", granted)
         viewModel.refreshPermissions()
     }
 
@@ -104,7 +106,10 @@ fun OnboardingScreen(
                 title = stringResource(R.string.permission_usage_stats_title),
                 description = stringResource(R.string.permission_usage_stats_desc),
                 isGranted = permissionState.hasUsageStats,
-                onGrantClick = { context.startActivity(usageStatsIntent) }
+                onGrantClick = {
+                    Timber.d("OnboardingScreen: Grant tapped — Usage Stats")
+                    context.startActivity(usageStatsIntent)
+                }
             )
 
             // Permission Card 2: Overlay
@@ -113,7 +118,10 @@ fun OnboardingScreen(
                 title = stringResource(R.string.permission_overlay_title),
                 description = stringResource(R.string.permission_overlay_desc),
                 isGranted = permissionState.hasOverlay,
-                onGrantClick = { context.startActivity(overlayIntent) }
+                onGrantClick = {
+                    Timber.d("OnboardingScreen: Grant tapped — Overlay")
+                    context.startActivity(overlayIntent)
+                }
             )
 
             // Permission Card 3: Notifications
@@ -123,6 +131,7 @@ fun OnboardingScreen(
                 description = stringResource(R.string.permission_notification_desc),
                 isGranted = permissionState.hasNotification,
                 onGrantClick = {
+                    Timber.d("OnboardingScreen: Grant tapped — Notifications")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
@@ -134,7 +143,10 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
-                onClick = onContinue,
+                onClick = {
+                    Timber.d("OnboardingScreen: Continue tapped (allGranted=%s)", permissionState.allGranted)
+                    onContinue()
+                },
                 enabled = permissionState.allGranted,
                 modifier = Modifier.fillMaxWidth()
             ) {

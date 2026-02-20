@@ -17,6 +17,7 @@ datastore = "1.1.4"
 room = "2.7.1"
 navigationCompose = "2.9.0"
 coroutines = "1.10.1"
+timber = "5.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -58,6 +59,9 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 
 # Coroutines
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# Logging
+timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

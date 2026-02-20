@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -59,13 +60,19 @@ class MonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Timber.d("onStartCommand: action=%s, flags=%d, startId=%d", intent?.action, flags, startId)
+
         if (intent?.action == ACTION_STOP) {
+            Timber.d("onStartCommand: ACTION_STOP received, starting graceful shutdown")
             serviceScope.launch {
                 if (activePackage != null) {
+                    Timber.d("onStartCommand: saving active session for %s before stopping", activePackage)
                     saveActiveSession(System.currentTimeMillis())
                 }
+                Timber.d("onStartCommand: setting tracking inactive")
                 repository.setTrackingActive(false)
                 withContext(Dispatchers.Main) {
+                    Timber.d("onStartCommand: hiding overlay and calling stopSelf")
                     timerManager?.hide()
                     timerManager = null
                     stopSelf()
@@ -74,6 +81,7 @@ class MonitorService : Service() {
             return START_NOT_STICKY
         }
 
+        Timber.d("onStartCommand: normal start — initializing service")
         usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
         val channel = NotificationChannel(
@@ -83,6 +91,7 @@ class MonitorService : Service() {
         )
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.createNotificationChannel(channel)
+        Timber.d("onStartCommand: notification channel created")
 
         val stopIntent = Intent(this, MonitorService::class.java).apply {
             action = ACTION_STOP
@@ -103,24 +112,30 @@ class MonitorService : Service() {
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            Timber.d("onStartCommand: startForeground with FOREGROUND_SERVICE_TYPE_SPECIAL_USE (API 34+)")
             startForeground(
                 NOTIFICATION_ID,
                 notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             )
         } else {
+            Timber.d("onStartCommand: startForeground (pre-API 34)")
             startForeground(NOTIFICATION_ID, notification)
         }
 
         timerManager = FloatingTimerManager(this)
+        Timber.d("onStartCommand: FloatingTimerManager created")
 
         serviceScope.launch {
             trackedPackages = repository.getSelectedApps().first()
+            Timber.d("onStartCommand: loaded %d tracked packages: %s", trackedPackages.size, trackedPackages)
 
+            Timber.d("onStartCommand: starting polling loop (3s interval)")
             while (isActive) {
                 checkForeground()
                 delay(3_000)
             }
+            Timber.d("onStartCommand: polling loop ended")
         }
 
         return START_STICKY
@@ -140,18 +155,24 @@ class MonitorService : Service() {
             .maxByOrNull { it.lastTimeUsed }
             ?.packageName
 
+        Timber.d("checkForeground: currentPackage=%s, activePackage=%s, isTracked=%s",
+            currentPackage, activePackage, currentPackage?.let { it in trackedPackages })
+
         when {
             currentPackage != null
                     && currentPackage in trackedPackages
                     && currentPackage != activePackage -> {
 
+                Timber.d("checkForeground: CASE A — new tracked app detected: %s", currentPackage)
                 if (activePackage != null) {
+                    Timber.d("checkForeground: saving previous session for %s", activePackage)
                     saveActiveSession(now)
                 }
 
                 activePackage = currentPackage
                 activeLabel = resolveAppLabel(currentPackage)
                 sessionStartTime = now
+                Timber.d("checkForeground: new session started — label=%s", activeLabel)
 
                 withContext(Dispatchers.Main) {
                     timerManager?.show(activeLabel!!)
@@ -163,6 +184,7 @@ class MonitorService : Service() {
                     && currentPackage == activePackage -> {
 
                 val elapsedSeconds = (now - sessionStartTime) / 1000
+                Timber.d("checkForeground: CASE B — same app %s, elapsed=%ds", activePackage, elapsedSeconds)
                 withContext(Dispatchers.Main) {
                     timerManager?.updateTimer(elapsedSeconds)
                 }
@@ -170,6 +192,7 @@ class MonitorService : Service() {
 
             else -> {
                 if (activePackage != null) {
+                    Timber.d("checkForeground: CASE C — left tracked app %s, saving session", activePackage)
                     saveActiveSession(now)
                 }
 
@@ -186,7 +209,10 @@ class MonitorService : Service() {
 
     private suspend fun saveActiveSession(endTime: Long) {
         val durationMs = endTime - sessionStartTime
-        if (durationMs < 1_000) return
+        if (durationMs < 1_000) {
+            Timber.d("saveActiveSession: skipping — duration %dms < 1000ms", durationMs)
+            return
+        }
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val date = dateFormat.format(Date(sessionStartTime))
@@ -200,24 +226,31 @@ class MonitorService : Service() {
             date = date
         )
 
+        Timber.d("saveActiveSession: pkg=%s, duration=%dms, date=%s", session.packageName, durationMs, date)
         usageSessionDao.insertSession(session)
+        Timber.d("saveActiveSession: insert complete")
     }
 
     private fun resolveAppLabel(packageName: String): String {
         return try {
             val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            packageManager.getApplicationLabel(appInfo).toString()
+            val label = packageManager.getApplicationLabel(appInfo).toString()
+            Timber.d("resolveAppLabel: %s → %s", packageName, label)
+            label
         } catch (_: PackageManager.NameNotFoundException) {
+            Timber.w("resolveAppLabel: %s not found, using package name", packageName)
             packageName
         }
     }
 
     override fun onDestroy() {
+        Timber.d("onDestroy: cleaning up")
         super.onDestroy()
         serviceScope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         activePackage = null
         activeLabel = null
         sessionStartTime = 0L
+        Timber.d("onDestroy: complete")
     }
 }

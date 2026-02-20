@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -44,6 +45,9 @@ class HomeViewModel @Inject constructor(
         ) { selectedPackages, isTracking ->
             val trackedApps = allApps.filter { it.packageName in selectedPackages }
 
+            Timber.d("uiState: selectedPackages=%d, trackedApps=%d, isTracking=%s, allAppsLoaded=%d",
+                selectedPackages.size, trackedApps.size, isTracking, allApps.size)
+
             HomeUiState(
                 trackedApps = trackedApps,
                 isTracking = isTracking,
@@ -56,17 +60,21 @@ class HomeViewModel @Inject constructor(
         )
 
     init {
+        Timber.d("init: loading installed apps")
         viewModelScope.launch(Dispatchers.IO) {
             allApps = repository.getInstalledApps()
+            Timber.d("init: loaded %d installed apps", allApps.size)
         }
     }
 
     fun toggleTracking() {
         viewModelScope.launch {
             val currentState = uiState.value
+            Timber.d("toggleTracking: current isTracking=%s, trackedApps=%d", currentState.isTracking, currentState.trackedApps.size)
 
             if (currentState.isTracking) {
                 // Stop tracking — send ACTION_STOP for graceful shutdown
+                Timber.d("toggleTracking: sending ACTION_STOP to MonitorService")
                 val intent = Intent(context, MonitorService::class.java).apply {
                     action = MonitorService.ACTION_STOP
                 }
@@ -74,14 +82,17 @@ class HomeViewModel @Inject constructor(
             } else {
                 // Guard: no apps selected
                 if (currentState.trackedApps.isEmpty()) {
+                    Timber.w("toggleTracking: no apps selected, showing toast")
                     _toastEvent.send(context.getString(R.string.home_no_apps_toast))
                     return@launch
                 }
 
                 // Start tracking
+                Timber.d("toggleTracking: starting MonitorService with %d tracked apps", currentState.trackedApps.size)
                 repository.setTrackingActive(true)
                 val intent = Intent(context, MonitorService::class.java)
                 context.startForegroundService(intent)
+                Timber.d("toggleTracking: startForegroundService called")
             }
         }
     }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 data class AppPickerUiState(
@@ -47,6 +48,8 @@ class AppPickerViewModel @Inject constructor(
                         .thenBy { it.label.lowercase() }
                 )
 
+            Timber.d("uiState: query='%s', selected=%d, filtered=%d", query, selected.size, filteredApps.size)
+
             AppPickerUiState(
                 apps = filteredApps,
                 searchQuery = query,
@@ -59,28 +62,36 @@ class AppPickerViewModel @Inject constructor(
         )
 
     init {
+        Timber.d("init: loading installed apps and seeding selection")
         viewModelScope.launch(Dispatchers.IO) {
             allApps = repository.getInstalledApps()
+            Timber.d("init: loaded %d installed apps", allApps.size)
             _selectedPackages.value = repository.getSelectedApps().first()
+            Timber.d("init: seeded %d selected packages", _selectedPackages.value.size)
         }
     }
 
     fun onSearchQueryChanged(query: String) {
+        Timber.d("onSearchQueryChanged: '%s'", query)
         _searchQuery.value = query
     }
 
     fun toggleSelection(packageName: String) {
         val current = _selectedPackages.value
-        _selectedPackages.value = if (packageName in current) {
+        val wasSelected = packageName in current
+        _selectedPackages.value = if (wasSelected) {
             current - packageName
         } else {
             current + packageName
         }
+        Timber.d("toggleSelection: %s %s (total selected: %d)", packageName, if (wasSelected) "DESELECTED" else "SELECTED", _selectedPackages.value.size)
     }
 
     fun saveSelection() {
+        Timber.d("saveSelection: saving %d packages", _selectedPackages.value.size)
         viewModelScope.launch {
             repository.saveSelectedApps(_selectedPackages.value)
+            Timber.d("saveSelection: complete")
         }
     }
 }

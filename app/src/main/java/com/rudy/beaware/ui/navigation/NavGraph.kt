@@ -18,6 +18,7 @@ import com.rudy.beaware.ui.screens.home.HomeScreen
 import com.rudy.beaware.ui.screens.onboarding.OnboardingScreen
 import com.rudy.beaware.ui.screens.picker.AppPickerScreen
 import com.rudy.beaware.util.PermissionHelper
+import timber.log.Timber
 
 object Route {
     const val ONBOARDING = "onboarding"
@@ -35,7 +36,9 @@ fun NavGraph(
         val allGranted = PermissionHelper.hasUsageStatsPermission(context)
                 && PermissionHelper.hasOverlayPermission(context)
                 && PermissionHelper.hasNotificationPermission(context)
-        if (allGranted) Route.HOME else Route.ONBOARDING
+        val dest = if (allGranted) Route.HOME else Route.ONBOARDING
+        Timber.d("NavGraph: startDestination=%s (allGranted=%s)", dest, allGranted)
+        dest
     }
 
     NavHost(
@@ -43,8 +46,10 @@ fun NavGraph(
         startDestination = startDestination
     ) {
         composable(Route.ONBOARDING) {
+            Timber.d("NavGraph: composing OnboardingScreen")
             OnboardingScreen(
                 onContinue = {
+                    Timber.d("NavGraph: onContinue — navigating to Home, popping Onboarding")
                     navController.navigate(Route.HOME) {
                         popUpTo(Route.ONBOARDING) { inclusive = true }
                     }
@@ -53,25 +58,31 @@ fun NavGraph(
         }
 
         composable(Route.HOME) {
+            Timber.d("NavGraph: composing HomeScreen")
             HomeScreen(
                 onNavigateToPicker = {
+                    Timber.d("NavGraph: navigating to Picker")
                     navController.navigate(Route.PICKER)
                 },
                 onNavigateToStats = {
+                    Timber.d("NavGraph: navigating to Stats")
                     navController.navigate(Route.STATS)
                 }
             )
         }
 
         composable(Route.PICKER) {
+            Timber.d("NavGraph: composing AppPickerScreen")
             AppPickerScreen(
                 onNavigateBack = {
+                    Timber.d("NavGraph: Picker — navigating back")
                     navController.popBackStack()
                 }
             )
         }
 
         composable(Route.STATS) {
+            Timber.d("NavGraph: composing Stats placeholder")
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center

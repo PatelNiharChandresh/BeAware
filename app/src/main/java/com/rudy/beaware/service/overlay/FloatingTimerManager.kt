@@ -20,6 +20,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import timber.log.Timber
 
 class FloatingTimerManager(private val context: Context) {
 
@@ -48,6 +49,7 @@ class FloatingTimerManager(private val context: Context) {
     }
 
     fun show(appLabel: String) {
+        Timber.d("show: appLabel=%s, alreadyVisible=%s", appLabel, containerView != null)
         if (containerView != null) {
             updateLabel(appLabel)
             return
@@ -60,6 +62,7 @@ class FloatingTimerManager(private val context: Context) {
 
         val owner = OverlayLifecycleOwner()
         owner.onCreate()
+        Timber.d("show: OverlayLifecycleOwner created and CREATED")
 
         val composeView = ComposeView(context).apply {
             setContent {
@@ -80,26 +83,32 @@ class FloatingTimerManager(private val context: Context) {
 
         windowManager.addView(container, params)
         owner.onResume()
+        Timber.d("show: overlay added to WindowManager, lifecycle RESUMED")
 
         containerView = container
         lifecycleOwner = owner
     }
 
     fun updateTimer(seconds: Long) {
+        Timber.d("updateTimer: seconds=%d", seconds)
         _elapsedSeconds.longValue = seconds
     }
 
     fun updateLabel(label: String) {
+        Timber.d("updateLabel: label=%s", label)
         _appLabel.value = label
     }
 
     fun hide() {
+        Timber.d("hide: containerView=%s", containerView != null)
         containerView?.let { view ->
             windowManager.removeView(view)
+            Timber.d("hide: overlay removed from WindowManager")
         }
         lifecycleOwner?.onDestroy()
         containerView = null
         lifecycleOwner = null
+        Timber.d("hide: cleanup complete, lifecycle DESTROYED")
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -118,6 +127,7 @@ class FloatingTimerManager(private val context: Context) {
                     initialY = params.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
+                    Timber.d("drag: ACTION_DOWN at (%.0f, %.0f)", event.rawX, event.rawY)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {

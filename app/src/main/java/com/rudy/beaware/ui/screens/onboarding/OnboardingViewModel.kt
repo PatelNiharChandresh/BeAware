@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import timber.log.Timber
 import javax.inject.Inject
 
 data class PermissionState(
@@ -28,14 +29,24 @@ class OnboardingViewModel @Inject constructor(
     val permissionState: StateFlow<PermissionState> = _permissionState.asStateFlow()
 
     init {
+        Timber.d("init: checking initial permissions")
         refreshPermissions()
     }
 
     fun refreshPermissions() {
-        _permissionState.value = PermissionState(
-            hasUsageStats = PermissionHelper.hasUsageStatsPermission(context),
-            hasOverlay = PermissionHelper.hasOverlayPermission(context),
-            hasNotification = PermissionHelper.hasNotificationPermission(context)
+        val usageStats = PermissionHelper.hasUsageStatsPermission(context)
+        val overlay = PermissionHelper.hasOverlayPermission(context)
+        val notification = PermissionHelper.hasNotificationPermission(context)
+
+        Timber.d("refreshPermissions: usageStats=%s, overlay=%s, notification=%s", usageStats, overlay, notification)
+
+        val newState = PermissionState(
+            hasUsageStats = usageStats,
+            hasOverlay = overlay,
+            hasNotification = notification
         )
+        _permissionState.value = newState
+
+        Timber.d("refreshPermissions: allGranted=%s", newState.allGranted)
     }
 }
