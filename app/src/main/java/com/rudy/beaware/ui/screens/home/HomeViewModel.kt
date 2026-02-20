@@ -12,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -33,7 +34,7 @@ class HomeViewModel @Inject constructor(
     private val repository: AppRepository
 ) : ViewModel() {
 
-    private var allApps: List<AppInfo> = emptyList()
+    private val _allApps = MutableStateFlow<List<AppInfo>>(emptyList())
 
     private val _toastEvent = Channel<String>(Channel.BUFFERED)
     val toastEvent = _toastEvent.receiveAsFlow()
@@ -41,8 +42,9 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> =
         combine(
             repository.getSelectedApps(),
-            repository.isTrackingActive()
-        ) { selectedPackages, isTracking ->
+            repository.isTrackingActive(),
+            _allApps
+        ) { selectedPackages, isTracking, allApps ->
             val trackedApps = allApps.filter { it.packageName in selectedPackages }
 
             Timber.d("uiState: selectedPackages=%d, trackedApps=%d, isTracking=%s, allAppsLoaded=%d",
@@ -62,8 +64,8 @@ class HomeViewModel @Inject constructor(
     init {
         Timber.d("init: loading installed apps")
         viewModelScope.launch(Dispatchers.IO) {
-            allApps = repository.getInstalledApps()
-            Timber.d("init: loaded %d installed apps", allApps.size)
+            _allApps.value = repository.getInstalledApps()
+            Timber.d("init: loaded %d installed apps", _allApps.value.size)
         }
     }
 

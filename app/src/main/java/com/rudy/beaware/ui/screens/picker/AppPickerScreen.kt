@@ -34,6 +34,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rudy.beaware.R
 import com.rudy.beaware.model.AppInfo
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +57,7 @@ fun AppPickerScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -73,8 +76,10 @@ fun AppPickerScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    viewModel.saveSelection()
-                    onNavigateBack()
+                    scope.launch {
+                        viewModel.saveSelection()
+                        onNavigateBack()
+                    }
                 },
                 icon = {
                     Icon(

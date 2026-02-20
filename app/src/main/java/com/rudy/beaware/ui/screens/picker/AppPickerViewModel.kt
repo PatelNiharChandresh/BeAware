@@ -87,11 +87,9 @@ class AppPickerViewModel @Inject constructor(
         Timber.d("toggleSelection: %s %s (total selected: %d)", packageName, if (wasSelected) "DESELECTED" else "SELECTED", _selectedPackages.value.size)
     }
 
-    fun saveSelection() {
+    suspend fun saveSelection() {
         Timber.d("saveSelection: saving %d packages", _selectedPackages.value.size)
-        viewModelScope.launch {
-            repository.saveSelectedApps(_selectedPackages.value)
-            Timber.d("saveSelection: complete")
-        }
+        repository.saveSelectedApps(_selectedPackages.value)
+        Timber.d("saveSelection: complete")
     }
 }
