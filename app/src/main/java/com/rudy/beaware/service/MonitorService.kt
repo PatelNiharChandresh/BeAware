@@ -23,7 +23,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,20 +63,7 @@ class MonitorService : Service() {
 
         if (intent?.action == ACTION_STOP) {
             Timber.d("onStartCommand: ACTION_STOP received, starting graceful shutdown")
-            serviceScope.launch {
-                if (activePackage != null) {
-                    Timber.d("onStartCommand: saving active session for %s before stopping", activePackage)
-                    saveActiveSession(System.currentTimeMillis())
-                }
-                Timber.d("onStartCommand: setting tracking inactive")
-                repository.setTrackingActive(false)
-                withContext(Dispatchers.Main) {
-                    Timber.d("onStartCommand: hiding overlay and calling stopSelf")
-                    timerManager?.hide()
-                    timerManager = null
-                    stopSelf()
-                }
-            }
+            gracefulShutdown()
             return START_NOT_STICKY
         }
 
@@ -127,9 +113,18 @@ class MonitorService : Service() {
         Timber.d("onStartCommand: FloatingTimerManager created")
 
         serviceScope.launch {
-            trackedPackages = repository.getSelectedApps().first()
-            Timber.d("onStartCommand: loaded %d tracked packages: %s", trackedPackages.size, trackedPackages)
+            repository.getSelectedApps().collect { packages ->
+                Timber.d("onStartCommand: selectedApps updated: %d packages: %s", packages.size, packages)
+                trackedPackages = packages
+                if (packages.isEmpty()) {
+                    Timber.d("onStartCommand: tracked apps is now empty — auto-stopping")
+                    gracefulShutdown()
+                    return@collect
+                }
+            }
+        }
 
+        serviceScope.launch {
             Timber.d("onStartCommand: starting polling loop (3s interval)")
             while (isActive) {
                 checkForeground()
@@ -203,6 +198,24 @@ class MonitorService : Service() {
                 activePackage = null
                 activeLabel = null
                 sessionStartTime = 0L
+            }
+        }
+    }
+
+    private fun gracefulShutdown() {
+        Timber.d("gracefulShutdown: starting")
+        serviceScope.launch {
+            if (activePackage != null) {
+                Timber.d("gracefulShutdown: saving active session for %s", activePackage)
+                saveActiveSession(System.currentTimeMillis())
+            }
+            Timber.d("gracefulShutdown: setting tracking inactive")
+            repository.setTrackingActive(false)
+            withContext(Dispatchers.Main) {
+                Timber.d("gracefulShutdown: hiding overlay and stopping service")
+                timerManager?.hide()
+                timerManager = null
+                stopSelf()
             }
         }
     }
