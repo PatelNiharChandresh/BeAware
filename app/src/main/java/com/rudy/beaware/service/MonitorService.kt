@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -133,22 +134,42 @@ class MonitorService : Service() {
             Timber.d("onStartCommand: polling loop ended")
         }
 
+        serviceScope.launch {
+            Timber.d("onStartCommand: starting display tick (1s interval)")
+            while (isActive) {
+                if (activePackage != null) {
+                    val elapsed = (System.currentTimeMillis() - sessionStartTime) / 1000
+                    withContext(Dispatchers.Main) {
+                        timerManager?.updateTimer(elapsed)
+                    }
+                }
+                delay(1_000)
+            }
+            Timber.d("onStartCommand: display tick ended")
+        }
+
         return START_STICKY
     }
 
     private suspend fun checkForeground() {
         val now = System.currentTimeMillis()
 
-        val stats = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
-            now - 10_000,
-            now
-        )
+        val usageEvents = usageStatsManager.queryEvents(now - 600_000, now)
+        val event = UsageEvents.Event()
+        var currentPackage: String? = null
 
-        val currentPackage = stats
-            .filter { it.lastTimeUsed > 0 }
-            .maxByOrNull { it.lastTimeUsed }
-            ?.packageName
+        while (usageEvents.hasNextEvent()) {
+            usageEvents.getNextEvent(event)
+            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                currentPackage = event.packageName
+            }
+        }
+
+        // Fallback: if no events in window but a session is active, foreground is unchanged
+        if (currentPackage == null && activePackage != null) {
+            Timber.d("checkForeground: no events in window, assuming foreground unchanged: %s", activePackage)
+            currentPackage = activePackage
+        }
 
         Timber.d("checkForeground: currentPackage=%s, activePackage=%s, isTracked=%s",
             currentPackage, activePackage, currentPackage?.let { it in trackedPackages })
@@ -180,24 +201,21 @@ class MonitorService : Service() {
 
                 val elapsedSeconds = (now - sessionStartTime) / 1000
                 Timber.d("checkForeground: CASE B — same app %s, elapsed=%ds", activePackage, elapsedSeconds)
-                withContext(Dispatchers.Main) {
-                    timerManager?.updateTimer(elapsedSeconds)
-                }
             }
 
             else -> {
                 if (activePackage != null) {
                     Timber.d("checkForeground: CASE C — left tracked app %s, saving session", activePackage)
                     saveActiveSession(now)
-                }
 
-                withContext(Dispatchers.Main) {
-                    timerManager?.hide()
-                }
+                    withContext(Dispatchers.Main) {
+                        timerManager?.hide()
+                    }
 
-                activePackage = null
-                activeLabel = null
-                sessionStartTime = 0L
+                    activePackage = null
+                    activeLabel = null
+                    sessionStartTime = 0L
+                }
             }
         }
     }
