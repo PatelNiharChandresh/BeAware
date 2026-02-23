@@ -23,7 +23,7 @@ fun TimerPill(
 
     Surface(
         shape = RoundedCornerShape(50),
-        color = Color.Black.copy(alpha = 0.7f),
+        color = Color(0xFFE91E63),
         shadowElevation = 4.dp
     ) {
         Text(
