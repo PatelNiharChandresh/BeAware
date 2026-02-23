@@ -38,6 +38,13 @@
     <string name="notification_tracking_text">Monitoring active</string>
     <string name="notification_stop">Stop</string>
 
-    <!-- Stats (Phase 2 placeholder) -->
-    <string name="stats_coming_soon">Stats — coming soon</string>
+    <!-- Stats -->
+    <string name="stats_title">Usage Stats</string>
+    <string name="stats_total_label">Total Screen Time</string>
+    <string name="stats_range_today">Today</string>
+    <string name="stats_range_three_days">3 Days</string>
+    <string name="stats_range_week">Week</string>
+    <string name="stats_range_month">Month</string>
+    <string name="stats_empty">No usage data for this period</string>
+    <string name="stats_sessions">%d sessions</string>
 </resources>

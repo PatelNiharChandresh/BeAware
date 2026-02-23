@@ -1,15 +1,8 @@
 package com.rudy.beaware.ui.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import com.rudy.beaware.R
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -17,6 +10,7 @@ import androidx.navigation.compose.rememberNavController
 import com.rudy.beaware.ui.screens.home.HomeScreen
 import com.rudy.beaware.ui.screens.onboarding.OnboardingScreen
 import com.rudy.beaware.ui.screens.picker.AppPickerScreen
+import com.rudy.beaware.ui.screens.stats.StatsScreen
 import com.rudy.beaware.util.PermissionHelper
 import timber.log.Timber
 
@@ -82,13 +76,13 @@ fun NavGraph(
         }
 
         composable(Route.STATS) {
-            Timber.d("NavGraph: composing Stats placeholder")
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = stringResource(R.string.stats_coming_soon))
-            }
+            Timber.d("NavGraph: composing StatsScreen")
+            StatsScreen(
+                onNavigateBack = {
+                    Timber.d("NavGraph: Stats — navigating back")
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }
