@@ -191,7 +191,7 @@ class MonitorService : Service() {
                 Timber.d("checkForeground: new session started — label=%s", activeLabel)
 
                 withContext(Dispatchers.Main) {
-                    timerManager?.show(activeLabel!!)
+                    timerManager?.show()
                 }
             }
 

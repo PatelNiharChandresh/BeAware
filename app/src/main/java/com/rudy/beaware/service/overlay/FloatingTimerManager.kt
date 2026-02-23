@@ -10,7 +10,6 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -27,7 +26,6 @@ class FloatingTimerManager(private val context: Context) {
     private val windowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-    private val _appLabel = mutableStateOf("")
     private val _elapsedSeconds = mutableLongStateOf(0L)
 
     private var containerView: FrameLayout? = null
@@ -48,14 +46,10 @@ class FloatingTimerManager(private val context: Context) {
         }
     }
 
-    fun show(appLabel: String) {
-        Timber.d("show: appLabel=%s, alreadyVisible=%s", appLabel, containerView != null)
-        if (containerView != null) {
-            updateLabel(appLabel)
-            return
-        }
+    fun show() {
+        Timber.d("show: alreadyVisible=%s", containerView != null)
+        if (containerView != null) return
 
-        _appLabel.value = appLabel
         _elapsedSeconds.longValue = 0L
 
         val params = createLayoutParams()
@@ -67,7 +61,6 @@ class FloatingTimerManager(private val context: Context) {
         val composeView = ComposeView(context).apply {
             setContent {
                 TimerPill(
-                    appLabel = _appLabel.value,
                     elapsedSeconds = _elapsedSeconds.longValue
                 )
             }
@@ -92,11 +85,6 @@ class FloatingTimerManager(private val context: Context) {
     fun updateTimer(seconds: Long) {
         Timber.d("updateTimer: seconds=%d", seconds)
         _elapsedSeconds.longValue = seconds
-    }
-
-    fun updateLabel(label: String) {
-        Timber.d("updateLabel: label=%s", label)
-        _appLabel.value = label
     }
 
     fun hide() {
