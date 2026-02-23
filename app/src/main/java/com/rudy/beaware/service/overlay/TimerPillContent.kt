@@ -1,5 +1,6 @@
 package com.rudy.beaware.service.overlay
 
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -9,19 +10,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.rudy.beaware.util.TimeFormatter
 
 @Composable
 fun TimerPill(
-    elapsedSeconds: Long
+    elapsedSeconds: Long,
+    onDrag: (Float, Float) -> Unit
 ) {
     val formattedTime = remember(elapsedSeconds) {
         TimeFormatter.formatTimer(elapsedSeconds)
     }
 
     Surface(
+        modifier = Modifier.pointerInput(Unit) {
+            detectDragGestures { _, dragAmount ->
+                onDrag(dragAmount.x, dragAmount.y)
+            }
+        },
         shape = RoundedCornerShape(50),
         color = Color(0xFFE91E63),
         shadowElevation = 4.dp

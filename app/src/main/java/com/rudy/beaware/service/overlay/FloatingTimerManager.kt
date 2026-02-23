@@ -1,14 +1,12 @@
 package com.rudy.beaware.service.overlay
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
-import android.os.Bundle
+import android.os.Build
 import android.view.Gravity
-import android.view.MotionEvent
-import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
+
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
@@ -30,8 +28,16 @@ class FloatingTimerManager(private val context: Context) {
 
     private var containerView: FrameLayout? = null
     private var lifecycleOwner: OverlayLifecycleOwner? = null
+    private var layoutParams: WindowManager.LayoutParams? = null
+
+    private var lastX: Int = 0
+    private var lastY: Int = 100
+    private var pillWidth: Int = 0
+    private var pillHeight: Int = 0
 
     private fun createLayoutParams(): WindowManager.LayoutParams {
+        val (safeX, safeY) = clampPosition(lastX, lastY)
+
         return WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -41,9 +47,28 @@ class FloatingTimerManager(private val context: Context) {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 0
-            y = 100
+            x = safeX
+            y = safeY
         }
+    }
+
+    private fun clampPosition(x: Int, y: Int): Pair<Int, Int> {
+        if (pillWidth == 0 || pillHeight == 0) {
+            return Pair(x, y)
+        }
+
+        val (screenWidth, screenHeight) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = windowManager.currentWindowMetrics.bounds
+            Pair(bounds.width(), bounds.height())
+        } else {
+            val metrics = context.resources.displayMetrics
+            Pair(metrics.widthPixels, metrics.heightPixels)
+        }
+
+        val clampedX = x.coerceIn(0, screenWidth - pillWidth)
+        val clampedY = y.coerceIn(0, screenHeight - pillHeight)
+
+        return Pair(clampedX, clampedY)
     }
 
     fun show() {
@@ -52,18 +77,36 @@ class FloatingTimerManager(private val context: Context) {
 
         _elapsedSeconds.longValue = 0L
 
-        val params = createLayoutParams()
+        layoutParams = createLayoutParams()
 
         val owner = OverlayLifecycleOwner()
         owner.onCreate()
         Timber.d("show: OverlayLifecycleOwner created and CREATED")
 
-        val composeView = ComposeView(context).apply {
-            setContent {
-                TimerPill(
-                    elapsedSeconds = _elapsedSeconds.longValue
-                )
-            }
+        val composeView = ComposeView(context)
+        composeView.setContent {
+            TimerPill(
+                elapsedSeconds = _elapsedSeconds.longValue,
+                onDrag = { dx, dy ->
+                    layoutParams?.let { lp ->
+                        lp.x += dx.toInt()
+                        lp.y += dy.toInt()
+
+                        val (clampedX, clampedY) = clampPosition(lp.x, lp.y)
+                        lp.x = clampedX
+                        lp.y = clampedY
+
+                        lastX = clampedX
+                        lastY = clampedY
+
+                        containerView?.let { view ->
+                            windowManager.updateViewLayout(view, lp)
+                        }
+
+                        Timber.d("onDrag: dx=%.0f, dy=%.0f, pos=(%d, %d)", dx, dy, clampedX, clampedY)
+                    }
+                }
+            )
         }
 
         val container = FrameLayout(context).apply {
@@ -72,9 +115,15 @@ class FloatingTimerManager(private val context: Context) {
 
         container.setViewTreeLifecycleOwner(owner)
         container.setViewTreeSavedStateRegistryOwner(owner)
-        container.setOnTouchListener(createDragTouchListener(params))
 
-        windowManager.addView(container, params)
+        windowManager.addView(container, layoutParams)
+
+        container.post {
+            pillWidth = container.width
+            pillHeight = container.height
+            Timber.d("show: pill measured — %dx%d", pillWidth, pillHeight)
+        }
+
         owner.onResume()
         Timber.d("show: overlay added to WindowManager, lifecycle RESUMED")
 
@@ -96,39 +145,8 @@ class FloatingTimerManager(private val context: Context) {
         lifecycleOwner?.onDestroy()
         containerView = null
         lifecycleOwner = null
+        layoutParams = null
         Timber.d("hide: cleanup complete, lifecycle DESTROYED")
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    private fun createDragTouchListener(
-        params: WindowManager.LayoutParams
-    ): View.OnTouchListener {
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-
-        return View.OnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    Timber.d("drag: ACTION_DOWN at (%.0f, %.0f)", event.rawX, event.rawY)
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    containerView?.let {
-                        windowManager.updateViewLayout(it, params)
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
     }
 }
 
