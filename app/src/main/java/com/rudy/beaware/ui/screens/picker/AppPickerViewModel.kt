@@ -31,9 +31,10 @@ class AppPickerViewModel @Inject constructor(
 
     private val _searchQuery = MutableStateFlow("")
     private val _selectedPackages = MutableStateFlow<Set<String>>(emptySet())
+    private val _isLoading = MutableStateFlow(true)
 
     val uiState: StateFlow<AppPickerUiState> =
-        combine(_searchQuery, _selectedPackages) { query, selected ->
+        combine(_searchQuery, _selectedPackages, _isLoading) { query, selected, loading ->
             val filteredApps = allApps
                 .filter { app ->
                     query.isBlank()
@@ -53,7 +54,7 @@ class AppPickerViewModel @Inject constructor(
             AppPickerUiState(
                 apps = filteredApps,
                 searchQuery = query,
-                isLoading = false
+                isLoading = loading
             )
         }.stateIn(
             scope = viewModelScope,
@@ -68,6 +69,7 @@ class AppPickerViewModel @Inject constructor(
             Timber.d("init: loaded %d installed apps", allApps.size)
             _selectedPackages.value = repository.getSelectedApps().first()
             Timber.d("init: seeded %d selected packages", _selectedPackages.value.size)
+            _isLoading.value = false
         }
     }
 
