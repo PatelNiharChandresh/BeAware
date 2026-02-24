@@ -18,7 +18,8 @@ import com.rudy.beaware.util.TimeFormatter
 @Composable
 fun TimerPill(
     elapsedSeconds: Long,
-    onDrag: (Float, Float) -> Unit
+    onDrag: (Float, Float) -> Unit,
+    onDragEnd: () -> Unit
 ) {
     val formattedTime = remember(elapsedSeconds) {
         TimeFormatter.formatTimer(elapsedSeconds)
@@ -26,9 +27,13 @@ fun TimerPill(
 
     Surface(
         modifier = Modifier.pointerInput(Unit) {
-            detectDragGestures { _, dragAmount ->
-                onDrag(dragAmount.x, dragAmount.y)
-            }
+            detectDragGestures(
+                onDragEnd = { onDragEnd() },
+                onDragCancel = { onDragEnd() },
+                onDrag = { _, dragAmount ->
+                    onDrag(dragAmount.x, dragAmount.y)
+                }
+            )
         },
         shape = RoundedCornerShape(50),
         color = Color(0xFFE91E63),

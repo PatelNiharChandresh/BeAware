@@ -1,12 +1,13 @@
 package com.rudy.beaware.service.overlay
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
-
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
@@ -30,13 +31,38 @@ class FloatingTimerManager(private val context: Context) {
     private var lifecycleOwner: OverlayLifecycleOwner? = null
     private var layoutParams: WindowManager.LayoutParams? = null
 
-    private var lastX: Int = 0
-    private var lastY: Int = 100
+    private var isOnRightEdge: Boolean = false
+    private var ratioY: Float = 0.046f
     private var pillWidth: Int = 0
     private var pillHeight: Int = 0
+    private var snapAnimator: ValueAnimator? = null
+
+    private fun getScreenSize(): Pair<Int, Int> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = windowManager.currentWindowMetrics.bounds
+            Pair(bounds.width(), bounds.height())
+        } else {
+            val metrics = context.resources.displayMetrics
+            Pair(metrics.widthPixels, metrics.heightPixels)
+        }
+    }
 
     private fun createLayoutParams(): WindowManager.LayoutParams {
-        val (safeX, safeY) = clampPosition(lastX, lastY)
+        val (screenWidth, screenHeight) = getScreenSize()
+
+        val absX = if (pillWidth > 0) {
+            if (isOnRightEdge) (screenWidth - pillWidth) else 0
+        } else {
+            0
+        }
+
+        val absY = if (pillHeight > 0) {
+            (ratioY * (screenHeight - pillHeight)).toInt()
+        } else {
+            100
+        }
+
+        val (safeX, safeY) = clampPosition(absX, absY)
 
         return WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -57,18 +83,57 @@ class FloatingTimerManager(private val context: Context) {
             return Pair(x, y)
         }
 
-        val (screenWidth, screenHeight) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val bounds = windowManager.currentWindowMetrics.bounds
-            Pair(bounds.width(), bounds.height())
-        } else {
-            val metrics = context.resources.displayMetrics
-            Pair(metrics.widthPixels, metrics.heightPixels)
-        }
+        val (screenWidth, screenHeight) = getScreenSize()
 
         val clampedX = x.coerceIn(0, screenWidth - pillWidth)
         val clampedY = y.coerceIn(0, screenHeight - pillHeight)
 
         return Pair(clampedX, clampedY)
+    }
+
+    private fun snapToEdge() {
+        val lp = layoutParams ?: return
+        val view = containerView ?: return
+        if (pillWidth == 0) return
+
+        val (screenWidth, screenHeight) = getScreenSize()
+        val currentX = lp.x
+        val currentY = lp.y
+
+        val pillCenterX = currentX + pillWidth / 2
+        val goRight = pillCenterX > screenWidth / 2
+
+        val targetX = if (goRight) (screenWidth - pillWidth) else 0
+
+        isOnRightEdge = goRight
+        ratioY = if (screenHeight - pillHeight > 0) {
+            currentY.toFloat() / (screenHeight - pillHeight)
+        } else {
+            0f
+        }
+        ratioY = ratioY.coerceIn(0f, 1f)
+
+        Timber.d("snapToEdge: currentX=%d, targetX=%d, right=%s, ratioY=%.3f",
+            currentX, targetX, goRight, ratioY)
+
+        snapAnimator?.cancel()
+
+        snapAnimator = ValueAnimator.ofInt(currentX, targetX).apply {
+            duration = 250
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { animator ->
+                lp.x = animator.animatedValue as Int
+                try {
+                    windowManager.updateViewLayout(view, lp)
+                } catch (e: IllegalArgumentException) {
+                    Timber.d("snapToEdge: view removed during animation, cancelling")
+                    cancel()
+                }
+            }
+            start()
+        }
+
+        Timber.d("snapToEdge: animation started")
     }
 
     fun show() {
@@ -88,6 +153,8 @@ class FloatingTimerManager(private val context: Context) {
             TimerPill(
                 elapsedSeconds = _elapsedSeconds.longValue,
                 onDrag = { dx, dy ->
+                    snapAnimator?.cancel()
+
                     layoutParams?.let { lp ->
                         lp.x += dx.toInt()
                         lp.y += dy.toInt()
@@ -96,15 +163,15 @@ class FloatingTimerManager(private val context: Context) {
                         lp.x = clampedX
                         lp.y = clampedY
 
-                        lastX = clampedX
-                        lastY = clampedY
-
                         containerView?.let { view ->
                             windowManager.updateViewLayout(view, lp)
                         }
 
                         Timber.d("onDrag: dx=%.0f, dy=%.0f, pos=(%d, %d)", dx, dy, clampedX, clampedY)
                     }
+                },
+                onDragEnd = {
+                    snapToEdge()
                 }
             )
         }
@@ -138,6 +205,8 @@ class FloatingTimerManager(private val context: Context) {
 
     fun hide() {
         Timber.d("hide: containerView=%s", containerView != null)
+        snapAnimator?.cancel()
+        snapAnimator = null
         containerView?.let { view ->
             windowManager.removeView(view)
             Timber.d("hide: overlay removed from WindowManager")
@@ -147,6 +216,39 @@ class FloatingTimerManager(private val context: Context) {
         lifecycleOwner = null
         layoutParams = null
         Timber.d("hide: cleanup complete, lifecycle DESTROYED")
+    }
+
+    fun onConfigurationChanged() {
+        snapAnimator?.cancel()
+
+        val view = containerView ?: return
+        val lp = layoutParams ?: return
+        if (pillWidth == 0 || pillHeight == 0) return
+
+        val (screenWidth, screenHeight) = getScreenSize()
+
+        val newX = if (isOnRightEdge) (screenWidth - pillWidth) else 0
+        val newY = (ratioY * (screenHeight - pillHeight)).toInt()
+            .coerceIn(0, screenHeight - pillHeight)
+
+        lp.x = newX
+        lp.y = newY
+
+        try {
+            windowManager.updateViewLayout(view, lp)
+        } catch (e: IllegalArgumentException) {
+            Timber.d("onConfigurationChanged: view not attached, skipping layout update")
+            return
+        }
+
+        Timber.d("onConfigurationChanged: right=%s, ratioY=%.3f, newPos=(%d, %d)",
+            isOnRightEdge, ratioY, newX, newY)
+
+        view.post {
+            pillWidth = view.width
+            pillHeight = view.height
+            Timber.d("onConfigurationChanged: pill re-measured — %dx%d", pillWidth, pillHeight)
+        }
     }
 }
 

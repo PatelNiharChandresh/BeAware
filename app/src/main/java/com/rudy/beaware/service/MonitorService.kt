@@ -59,6 +59,12 @@ class MonitorService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Timber.d("onConfigurationChanged: orientation=%d", newConfig.orientation)
+        timerManager?.onConfigurationChanged()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Timber.d("onStartCommand: action=%s, flags=%d, startId=%d", intent?.action, flags, startId)
 
